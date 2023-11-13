@@ -155,7 +155,7 @@ class WebGLApp {
         e.preventDefault();
         this.pickedIdx = undefined;
       },
-      false
+      { passive: false }
     );
   }
   /**
