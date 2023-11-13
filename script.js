@@ -169,7 +169,7 @@ class WebGLApp {
         e.preventDefault();
         let touch = e.touches[0];
 
-        let [x, y] = [touch.clientX, touch.clientY];
+        let [x, y] = [touch.pageX, touch.pageY];
 
         for (let i = 0; i < this.masses.length; i++) {
           let m = this.masses[i];
@@ -194,7 +194,7 @@ class WebGLApp {
         e.preventDefault();
         if (this.pickedIdx !== null && this.pickedIdx < this.masses.length) {
           let touch = e.touches[0];
-          let [x, y] = [touch.clientX, touch.clientX];
+          let [x, y] = [touch.pageX, touch.pageY];
           this.masses[this.pickedIdx][0] = (2 * x) / this.canvas.width - 1.0;
           this.masses[this.pickedIdx][1] =
             (2 * (this.canvas.height - y)) / this.canvas.height - 1.0;
