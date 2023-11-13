@@ -110,32 +110,28 @@ class WebGLApp {
       this.pickedIdx = null;
     });
 
-    window.addEventListener(
-      "touchstart",
-      (e) => {
-        e.preventDefault();
-        let touch = e.touches[0];
-        let [x, y] = [touch.offsetX, touch.offsetY];
+    window.addEventListener("touchstart", (e) => {
+      //   e.preventDefault();
+      let touch = e.touches[0];
+      let [x, y] = [touch.offsetX, touch.offsetY];
 
-        for (let i = 0; i < this.masses.length; i++) {
-          let m = this.masses[i];
-          let [mx, my] = [
-            (m[0] + 1.0) * (this.canvas.width / 2),
-            this.canvas.height - (m[1] + 1.0) * (this.canvas.height / 2),
-          ];
-          let [dx, dy] = [mx - x, my - y];
+      for (let i = 0; i < this.masses.length; i++) {
+        let m = this.masses[i];
+        let [mx, my] = [
+          (m[0] + 1.0) * (this.canvas.width / 2),
+          this.canvas.height - (m[1] + 1.0) * (this.canvas.height / 2),
+        ];
+        let [dx, dy] = [mx - x, my - y];
 
-          // pick up the closest m to the mouse
-          if (dx * dx + dy * dy < 25) {
-            this.pickedIdx = i;
-            break;
-          }
+        // pick up the closest m to the mouse
+        if (dx * dx + dy * dy < 100) {
+          this.pickedIdx = i;
+          break;
         }
-      },
-      { passive: false }
-    );
+      }
+    });
     window.addEventListener("touchmove", (e) => {
-      e.preventDefault();
+      //   e.preventDefault();
       if (this.pickedIdx !== null) {
         let touch = e.touches[0];
         let [x, y] = [touch.offsetX, touch.offsetY];
