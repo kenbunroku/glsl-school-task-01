@@ -8,6 +8,8 @@ layout(std140) uniform Masses {
   vec4 massPosition[3];
 };
 
+uniform float size;
+
 out vec3 tfPosition;
 out vec3 tfVelocity;
 out vec3 vColor;
@@ -32,6 +34,6 @@ void main() {
 
   vColor = aColor;
 
-  gl_PointSize = 2.0f;
+  gl_PointSize = size;
   gl_Position = vec4(position.xy, 0.0f, 1.0f);
 }
