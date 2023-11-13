@@ -111,7 +111,7 @@ class WebGLApp {
     });
 
     this.canvas.addEventListener("touchstart", (e) => {
-        e.preventDefault();
+      e.preventDefault();
       let touch = e.touches[0];
       let [x, y] = [touch.offsetX, touch.offsetY];
 
@@ -131,8 +131,8 @@ class WebGLApp {
       }
     });
     this.canvas.addEventListener("touchmove", (e) => {
-        e.preventDefault();
-      if (this.pickedIdx !== null) {
+      e.preventDefault();
+      if (this.pickedIdx !== undefined) {
         let touch = e.touches[0];
         let [x, y] = [touch.offsetX, touch.offsetY];
         this.masses[this.pickedIdx][0] = (2 * x) / this.canvas.width - 1.0;
@@ -140,8 +140,9 @@ class WebGLApp {
           (2 * (this.canvas.height - y)) / this.canvas.height - 1.0;
       }
     });
-    this.canvas.addEventListener("touchend", (e) => {
-      this.pickedIdx = null;
+    this.canvas.addEventListener("touchend", () => {
+      e.preventDefault();
+      this.pickedIdx = undefined;
     });
   }
   /**
