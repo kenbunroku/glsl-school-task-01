@@ -109,6 +109,43 @@ class WebGLApp {
     window.addEventListener("pointerup", (e) => {
       this.pickedIdx = null;
     });
+
+    window.addEventListener(
+      "touchstart",
+      (e) => {
+        e.preventDefault();
+        let touch = e.touches[0];
+        let [x, y] = [touch.pageX, touch.pageY];
+
+        for (let i = 0; i < this.masses.length; i++) {
+          let m = this.masses[i];
+          let [mx, my] = [
+            (m[0] + 1.0) * (this.canvas.width / 2),
+            this.canvas.height - (m[1] + 1.0) * (this.canvas.height / 2),
+          ];
+          let [dx, dy] = [mx - x, my - y];
+
+          // pick up the closest m to the mouse
+          if (dx * dx + dy * dy < 25) {
+            this.pickedIdx = i;
+            break;
+          }
+        }
+      },
+      { passive: false }
+    );
+    window.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      if (e.buttons && this.pickedIdx !== null) {
+        let [x, y] = [e.offsetX, e.offsetY];
+        this.masses[this.pickedIdx][0] = (2 * x) / this.canvas.width - 1.0;
+        this.masses[this.pickedIdx][1] =
+          (2 * (this.canvas.height - y)) / this.canvas.height - 1.0;
+      }
+    });
+    window.addEventListener("touchend", (e) => {
+      this.pickedIdx = null;
+    });
   }
   /**
    * シェーダやテクスチャ用の画像など非同期で読み込みする処理を行う。
