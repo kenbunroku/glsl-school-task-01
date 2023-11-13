@@ -115,54 +115,6 @@ class WebGLApp {
     window.addEventListener("pointerup", (e) => {
       this.pickedIdx = null;
     });
-
-    window.addEventListener(
-      "touchstart",
-      (e) => {
-        e.preventDefault();
-        let touch = e.touches[0];
-
-        let [x, y] = [touch.clientX, touch.clientY];
-
-        for (let i = 0; i < this.masses.length; i++) {
-          let m = this.masses[i];
-          let [mx, my] = [
-            (m[0] + 1.0) * (this.canvas.width / 2),
-            this.canvas.height - (m[1] + 1.0) * (this.canvas.height / 2),
-          ];
-          let [dx, dy] = [mx - x, my - y];
-
-          // pick up the closest m to the mouse
-          if (dx * dx + dy * dy < 500) {
-            this.pickedIdx = i;
-            break;
-          }
-        }
-      },
-      { passive: false }
-    );
-    window.addEventListener(
-      "touchmove",
-      (e) => {
-        e.preventDefault();
-        if (this.pickedIdx !== null && this.pickedIdx < this.masses.length) {
-          let touch = e.touches[0];
-          let [x, y] = [touch.clientX, touch.clientX];
-          this.masses[this.pickedIdx][0] = (2 * x) / this.canvas.width - 1.0;
-          this.masses[this.pickedIdx][1] =
-            (2 * (this.canvas.height - y)) / this.canvas.height - 1.0;
-        }
-      },
-      { passive: false }
-    );
-    window.addEventListener(
-      "touchend",
-      (e) => {
-        e.preventDefault();
-        this.pickedIdx = null;
-      },
-      { passive: false }
-    );
   }
   /**
    * シェーダやテクスチャ用の画像など非同期で読み込みする処理を行う。
@@ -194,6 +146,7 @@ class WebGLApp {
    * WebGL のレンダリングを開始する前のセットアップを行う。
    */
   setup() {
+    if (this.canvas !== null) this.setupTouchEvents();
     this.setupGeometry();
     this.setupTransformFeedback();
     this.setupMass();
@@ -206,6 +159,56 @@ class WebGLApp {
     // Inside the WebGLApp constructor or init method
     this.maxTFComponents = this.gl.getParameter(
       this.gl.MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS
+    );
+  }
+
+  setupTouchEvents() {
+    this.canvas.addEventListener(
+      "touchstart",
+      (e) => {
+        e.preventDefault();
+        let touch = e.touches[0];
+
+        let [x, y] = [touch.clientX, touch.clientY];
+
+        for (let i = 0; i < this.masses.length; i++) {
+          let m = this.masses[i];
+          let [mx, my] = [
+            (m[0] + 1.0) * (this.canvas.width / 2),
+            this.canvas.height - (m[1] + 1.0) * (this.canvas.height / 2),
+          ];
+          let [dx, dy] = [mx - x, my - y];
+
+          // pick up the closest m to the mouse
+          if (dx * dx + dy * dy < 500) {
+            this.pickedIdx = i;
+            break;
+          }
+        }
+      },
+      { passive: false }
+    );
+    this.canvas.addEventListener(
+      "touchmove",
+      (e) => {
+        e.preventDefault();
+        if (this.pickedIdx !== null && this.pickedIdx < this.masses.length) {
+          let touch = e.touches[0];
+          let [x, y] = [touch.clientX, touch.clientX];
+          this.masses[this.pickedIdx][0] = (2 * x) / this.canvas.width - 1.0;
+          this.masses[this.pickedIdx][1] =
+            (2 * (this.canvas.height - y)) / this.canvas.height - 1.0;
+        }
+      },
+      { passive: false }
+    );
+    this.canvas.addEventListener(
+      "touchend",
+      (e) => {
+        e.preventDefault();
+        this.pickedIdx = null;
+      },
+      { passive: false }
     );
   }
   /**
