@@ -110,12 +110,13 @@ class WebGLApp {
       this.pickedIdx = null;
     });
 
-    this.canvas.addEventListener(
+    window.addEventListener(
       "touchstart",
       (e) => {
         e.preventDefault();
         let touch = e.touches[0];
-        let [x, y] = [touch.offsetX, touch.offsetY];
+
+        let [x, y] = [touch.pageX, touch.pageY];
 
         for (let i = 0; i < this.masses.length; i++) {
           let m = this.masses[i];
@@ -132,25 +133,25 @@ class WebGLApp {
           }
         }
       },
-      false
+      { passive: false }
     );
-    this.canvas.addEventListener(
+    window.addEventListener(
       "touchmove",
       (e) => {
         e.preventDefault();
         if (this.pickedIdx !== undefined) {
           let touch = e.touches[0];
-          let [x, y] = [touch.offsetX, touch.offsetY];
+          let [x, y] = [touch.pageX, touch.pageY];
           this.masses[this.pickedIdx][0] = (2 * x) / this.canvas.width - 1.0;
           this.masses[this.pickedIdx][1] =
             (2 * (this.canvas.height - y)) / this.canvas.height - 1.0;
         }
       },
-      false
+      { passive: false }
     );
-    this.canvas.addEventListener(
+    window.addEventListener(
       "touchend",
-      () => {
+      (e) => {
         e.preventDefault();
         this.pickedIdx = undefined;
       },
