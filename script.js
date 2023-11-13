@@ -81,6 +81,7 @@ class WebGLApp {
     // マウス座標用のイベントを設定
     // Move the masses position around with the mouse
     window.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
       const [x, y] = [e.offsetX, e.offsetY];
 
       for (let i = 0; i < this.masses.length; i++) {
@@ -99,7 +100,12 @@ class WebGLApp {
       }
     });
     window.addEventListener("pointermove", (e) => {
-      if (e.buttons && this.pickedIdx !== null) {
+      e.preventDefault();
+      if (
+        e.buttons &&
+        this.pickedIdx !== null &&
+        this.pickedIdx < this.masses.length
+      ) {
         let [x, y] = [e.offsetX, e.offsetY];
         this.masses[this.pickedIdx][0] = (2 * x) / this.canvas.width - 1.0;
         this.masses[this.pickedIdx][1] =
@@ -127,7 +133,7 @@ class WebGLApp {
           let [dx, dy] = [mx - x, my - y];
 
           // pick up the closest m to the mouse
-          if (dx * dx + dy * dy < 100) {
+          if (dx * dx + dy * dy < 500) {
             this.pickedIdx = i;
             break;
           }
@@ -139,7 +145,7 @@ class WebGLApp {
       "touchmove",
       (e) => {
         e.preventDefault();
-        if (this.pickedIdx !== undefined) {
+        if (this.pickedIdx !== null && this.pickedIdx < this.masses.length) {
           let touch = e.touches[0];
           let [x, y] = [touch.pageX, touch.pageY];
           this.masses[this.pickedIdx][0] = (2 * x) / this.canvas.width - 1.0;
@@ -153,7 +159,7 @@ class WebGLApp {
       "touchend",
       (e) => {
         e.preventDefault();
-        this.pickedIdx = undefined;
+        this.pickedIdx = null;
       },
       { passive: false }
     );
