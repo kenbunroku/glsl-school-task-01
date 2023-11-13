@@ -32,44 +32,83 @@ class WebGLApp {
     this.render = this.render.bind(this);
 
     // uniform 変数用
-    this.uPointSize = 1.0;
-    this.uMouse = [0.0, 0.0]; // マウス座標用
-
-    this.numOfParticles = 20000;
+    const PARAMS = {
+      numOfParticles: 10000,
+      size: 3.0,
+      gravity: 0.00002,
+      hiddenMasses: false,
+    };
+    this.numOfParticles = PARAMS.numOfParticles;
+    this.size = PARAMS.size;
+    this.gravity = PARAMS.gravity;
+    this.hiddenMasses = PARAMS.hiddenMasses;
 
     this.currentSourceIdx = 1;
 
-    this.frame = 0;
+    this.pickedIdx = null;
 
     // tweakpane を初期化
     const pane = new Pane();
     pane
-      .addBlade({
-        view: "slider",
-        label: "number-of-particles",
+      .addBinding(PARAMS, "numOfParticles", {
         step: 1,
         min: 1000,
-        max: 20000,
-        value: this.numOfParticles,
+        max: 10000,
       })
       .on("change", (v) => {
         this.numOfParticles = v.value;
       });
+    pane
+      .addBinding(PARAMS, "size", {
+        min: 3.0,
+        max: 10.0,
+      })
+      .on("change", (v) => {
+        this.size = v.value;
+      });
+    pane
+      .addBinding(PARAMS, "gravity", {
+        min: 0.000002,
+        max: 0.0001,
+      })
+      .on("change", (v) => {
+        this.gravity = v.value;
+      });
+    pane.addBinding(PARAMS, "hiddenMasses").on("change", (v) => {
+      this.hiddenMasses = v.value;
+    });
 
     // マウス座標用のイベントを設定
-    window.addEventListener(
-      "pointermove",
-      (mouseEvent) => {
-        const x = mouseEvent.pageX / window.innerWidth;
-        const y = mouseEvent.pageY / window.innerHeight;
-        const signedX = x * 2.0 - 1.0;
-        const signedY = y * 2.0 - 1.0;
+    // Move the masses position around with the mouse
+    window.addEventListener("pointerdown", (e) => {
+      const [x, y] = [e.offsetX, e.offsetY];
 
-        this.uMouse[0] = signedX;
-        this.uMouse[1] = -signedY; // スクリーン空間とは正負が逆
-      },
-      false
-    );
+      for (let i = 0; i < this.masses.length; i++) {
+        let m = this.masses[i];
+        let [mx, my] = [
+          (m[0] + 1.0) * (this.canvas.width / 2),
+          this.canvas.height - (m[1] + 1.0) * (this.canvas.height / 2),
+        ];
+        let [dx, dy] = [mx - x, my - y];
+
+        // pick up the closest m to the mouse
+        if (dx * dx + dy * dy < 25) {
+          this.pickedIdx = i;
+          break;
+        }
+      }
+    });
+    window.addEventListener("pointermove", (e) => {
+      if (e.buttons && this.pickedIdx !== null) {
+        let [x, y] = [e.offsetX, e.offsetY];
+        this.masses[this.pickedIdx][0] = (2 * x) / this.canvas.width - 1.0;
+        this.masses[this.pickedIdx][1] =
+          (2 * (this.canvas.height - y)) / this.canvas.height - 1.0;
+      }
+    });
+    window.addEventListener("pointerup", (e) => {
+      this.pickedIdx = null;
+    });
   }
   /**
    * シェーダやテクスチャ用の画像など非同期で読み込みする処理を行う。
@@ -83,6 +122,8 @@ class WebGLApp {
       fragmentShaderSource: fs,
       attribute: ["aPosition", "aColor", "aVelocity"],
       stride: [3, 3, 3],
+      uniform: ["size"],
+      type: ["uniform1f"],
       transformFeedbackVaryings: ["tfPosition", "tfVelocity"],
     });
 
@@ -91,8 +132,8 @@ class WebGLApp {
     this.massProgram = new ShaderProgram(this.gl, {
       vertexShaderSource: massVs,
       fragmentShaderSource: massFs,
-      attribute: ["quad"],
-      stride: [2],
+      attribute: ["mPosition"],
+      stride: [4],
     });
   }
   /**
@@ -102,12 +143,16 @@ class WebGLApp {
     this.setupGeometry();
     this.setupTransformFeedback();
     this.setupMass();
-    this.setupQuadVa();
+    this.setupMassDraw();
     this.resize();
-    this.gl.clearColor(0.1, 0.1, 0.1, 1.0);
     this.gl.enable(this.gl.BLEND);
     this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
+    this.gl.clearColor(0.0, 0.0, 0.0, 1.0);
     this.running = true;
+    // Inside the WebGLApp constructor or init method
+    this.maxTFComponents = this.gl.getParameter(
+      this.gl.MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS
+    );
   }
   /**
    * ジオメトリ（頂点情報）を構築するセットアップを行う。
@@ -161,12 +206,12 @@ class WebGLApp {
 
       // Bind and setup VBO for color
       gl.bindBuffer(gl.ARRAY_BUFFER, this.vbos[i][1]);
-      gl.enableVertexAttribArray(1); // Assuming 'aColor' is at location 1
+      gl.enableVertexAttribArray(1);
       gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
 
       // Bind and setup VBO for velocity
       gl.bindBuffer(gl.ARRAY_BUFFER, this.vbos[i][2]);
-      gl.enableVertexAttribArray(2); // Assuming 'aVelocity' is at location 2
+      gl.enableVertexAttribArray(2);
       gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 0, 0);
 
       gl.bindVertexArray(null);
@@ -194,37 +239,71 @@ class WebGLApp {
   setupMass() {
     const gl = this.gl;
 
-    let masses = [];
-    for (let i = 0; i < 10; i++) {
-      masses.push(
+    this.masses = [];
+    for (let i = 0; i < 3; i++) {
+      this.masses.push(
         new Float32Array([
           Math.random() * 2.0 - 1.0,
           Math.random() * 2.0 - 1.0,
           Math.random() * 2.0 - 1.0,
-          1 / 200000,
+          this.gravity,
         ])
       );
     }
 
-    const massUniformBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.UNIFORM_BUFFER, massUniformBuffer);
+    this.massUniformBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.UNIFORM_BUFFER, this.massUniformBuffer);
 
-    const flattenedMasses = new Float32Array(masses.map((m) => [...m]).flat());
+    const flattenedMasses = new Float32Array(
+      this.masses.map((m) => [...m]).flat()
+    );
 
     gl.bufferData(gl.UNIFORM_BUFFER, flattenedMasses, gl.STATIC_DRAW);
 
+    // Bind the buffer to the uniform block in the shader program
     const blockIndex = gl.getUniformBlockIndex(
       this.shaderProgram.program,
       "Masses"
     );
     gl.uniformBlockBinding(this.shaderProgram.program, blockIndex, 0);
-    gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, massUniformBuffer);
+    gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, this.massUniformBuffer);
   }
 
-  setupQuadVa() {
-    this.vb = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
-    this.va = [WebGLUtility.createVbo(this.gl, this.vb)];
+  //   setupQuadVa() {
+  //     const gl = this.gl;
+  //     this.vb = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+  //     this.quadVBO = WebGLUtility.createVbo(this.gl, this.vb);
+
+  //     this.quadVAO = gl.createVertexArray();
+  //     gl.bindVertexArray(this.quadVAO);
+  //     gl.bindBuffer(gl.ARRAY_BUFFER, this.quadVBO);
+  //     gl.enableVertexAttribArray(0);
+  //     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  //     gl.bindVertexArray(null);
+  //   }
+
+  setupMassDraw() {
+    const gl = this.gl;
+
+    const massPositions = new Float32Array(
+      this.masses.map((m) => [...m]).flat()
+    );
+
+    // Create VBO for mass positions
+    this.massPositionVBO = WebGLUtility.createVbo(gl, massPositions);
+
+    // Create VAO for mass positions
+    const massPositionVAO = gl.createVertexArray();
+    gl.bindVertexArray(massPositionVAO);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.massPositionVBO);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 0, 0);
+    gl.bindVertexArray(null);
+
+    // Store VAO for later use
+    this.massPositionVAO = massPositionVAO;
   }
+
   /**
    * WebGL を利用して描画を行う。
    */
@@ -236,21 +315,41 @@ class WebGLApp {
       requestAnimationFrame(this.render);
     }
 
+    for (let i = 0; i < this.masses.length; i++) {
+      this.masses[i][3] = this.gravity;
+    }
+    const updatedMasses = new Float32Array(
+      this.masses.map((m) => [...m]).flat()
+    );
+    gl.bindBuffer(gl.UNIFORM_BUFFER, this.massUniformBuffer);
+    gl.bufferData(gl.UNIFORM_BUFFER, updatedMasses, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.UNIFORM_BUFFER, null);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.massPositionVBO);
+    gl.bufferData(gl.ARRAY_BUFFER, updatedMasses, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
     // ビューポートの設定と背景のクリア
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.clear(gl.COLOR_BUFFER_BIT);
-
-    // プログラムオブジェクトを指定し、VBO と uniform 変数を設定
-    // this.massProgram.use();
-    // this.massProgram.setAttribute(this.va);
-
-    // gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    this.shaderProgram.use();
 
     const tfs = [this.tfA, this.tfB];
     const sourceIndex = this.currentSourceIdx;
     const destIndex = (this.currentSourceIdx + 1) % 2;
 
+    if (!this.hiddenMasses) {
+      this.massProgram.use();
+      gl.bindVertexArray(this.massPositionVAO);
+      const sizeUniformLocation = gl.getUniformLocation(
+        this.massProgram.program,
+        ["size"]
+      );
+      gl.uniform1f(sizeUniformLocation, this.size);
+      gl.drawArrays(gl.POINTS, 0, this.masses.length);
+    }
+
+    this.shaderProgram.use();
+    this.shaderProgram.setUniform([this.size]);
     // set up for transform feedback
     gl.bindVertexArray(this.vaos[sourceIndex]);
     gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, tfs[destIndex]);
@@ -272,6 +371,7 @@ class WebGLApp {
   resize() {
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
+    this.uResolution = [this.canvas.width, this.canvas.height];
   }
   /**
    * WebGL を実行するための初期化処理を行う。
@@ -290,7 +390,12 @@ class WebGLApp {
     if (this.canvas == null) {
       throw new Error("invalid argument");
     }
-    this.gl = this.canvas.getContext("webgl2", option);
+    const contextAttributes = {
+      ...option,
+      premultipliedAlpha: false,
+      preserveDrawingBuffer: true,
+    };
+    this.gl = this.canvas.getContext("webgl2", contextAttributes);
     if (this.gl == null) {
       throw new Error("webgl2 not supported");
     }
