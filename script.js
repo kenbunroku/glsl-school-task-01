@@ -81,7 +81,6 @@ class WebGLApp {
     // マウス座標用のイベントを設定
     // Move the masses position around with the mouse
     window.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
       const [x, y] = [e.offsetX, e.offsetY];
 
       for (let i = 0; i < this.masses.length; i++) {
@@ -100,7 +99,6 @@ class WebGLApp {
       }
     });
     window.addEventListener("pointermove", (e) => {
-      e.preventDefault();
       if (
         e.buttons &&
         this.pickedIdx !== null &&
