@@ -37,11 +37,13 @@ class WebGLApp {
       size: 3.0,
       gravity: 0.00002,
       hiddenMasses: false,
+      attenuation: 0.1,
     };
     this.numOfParticles = PARAMS.numOfParticles;
     this.size = PARAMS.size;
     this.gravity = PARAMS.gravity;
     this.hiddenMasses = PARAMS.hiddenMasses;
+    this.attenuation = PARAMS.attenuation;
 
     this.currentSourceIdx = 1;
 
@@ -77,6 +79,14 @@ class WebGLApp {
     pane.addBinding(PARAMS, "hiddenMasses").on("change", (v) => {
       this.hiddenMasses = v.value;
     });
+    pane
+      .addBinding(PARAMS, "attenuation", {
+        min: 0.01,
+        max: 1.0,
+      })
+      .on("change", (v) => {
+        this.attenuation = v.value;
+      });
 
     // マウス座標用のイベントを設定
     // Move the masses position around with the mouse
@@ -152,7 +162,12 @@ class WebGLApp {
     this.setupQuadVa();
     this.resize();
     this.gl.enable(this.gl.BLEND);
-    this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
+    this.gl.blendFuncSeparate(
+      this.gl.SRC_ALPHA,
+      this.gl.ONE_MINUS_SRC_ALPHA,
+      this.gl.ONE,
+      this.gl.ONE
+    );
     this.gl.clearColor(0.0, 0.0, 0.0, 1.0);
     this.running = true;
     // Inside the WebGLApp constructor or init method
@@ -391,11 +406,26 @@ class WebGLApp {
     // draw semi-transparent background
     this.massProgram.use();
     gl.bindVertexArray(this.quadVAO);
-    const sizeUniformLocation = gl.getUniformLocation(
+    const resolutionUniformLocation = gl.getUniformLocation(
       this.massProgram.program,
       "uResolution"
     );
-    gl.uniform2f(sizeUniformLocation, this.canvas.width, this.canvas.height);
+    gl.uniform2f(
+      resolutionUniformLocation,
+      this.canvas.width,
+      this.canvas.height
+    );
+    const hiddenMassesUniformLocation = gl.getUniformLocation(
+      this.massProgram.program,
+      "uHiddenMasses"
+    );
+    const hiddenMassesFlag = this.hiddenMasses ? 1 : 0;
+    gl.uniform1i(hiddenMassesUniformLocation, hiddenMassesFlag);
+    const attenuationUniformLocation = gl.getUniformLocation(
+      this.massProgram.program,
+      "uAttenuation"
+    );
+    gl.uniform1f(attenuationUniformLocation, this.attenuation);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     // draw particles

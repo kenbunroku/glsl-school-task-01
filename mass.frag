@@ -6,6 +6,8 @@ layout(std140) uniform Mass {
 };
 
 uniform vec2 uResolution;
+uniform int uHiddenMasses;
+uniform float uAttenuation;
 
 out vec4 fragColor;
 
@@ -17,9 +19,9 @@ void main() {
         minDist = min(minDist, dist2);
     }
 
-    if(minDist > 5.0f * 5.0f) {
+    if(minDist > 5.0f * 5.0f || uHiddenMasses == 1) {
         // Slightly transparent black
-        fragColor = vec4(0.0f, 0.0f, 0.0f, 0.10f);
+        fragColor = vec4(0.0f, 0.0f, 0.0f, uAttenuation);
     } else {
         // Red color for mass positions
         fragColor = vec4(1.0f, 0.0f, 0.0f, 1.0f);
