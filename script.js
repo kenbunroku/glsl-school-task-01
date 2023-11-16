@@ -92,7 +92,7 @@ class WebGLApp {
         let [dx, dy] = [mx - x, my - y];
 
         // pick up the closest m to the mouse
-        if (dx * dx + dy * dy < 25) {
+        if (dx * dx + dy * dy < 50) {
           this.pickedIdx = i;
           break;
         }
@@ -149,6 +149,7 @@ class WebGLApp {
     this.setupTransformFeedback();
     this.setupMass();
     this.setupMassDraw();
+    this.setupQuadVa();
     this.resize();
     this.gl.enable(this.gl.BLEND);
     this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
@@ -178,7 +179,7 @@ class WebGLApp {
           let [dx, dy] = [mx - x, my - y];
 
           // pick up the closest m to the mouse
-          if (dx * dx + dy * dy < 100) {
+          if (dx * dx + dy * dy < 300) {
             this.pickedIdx = i;
             break;
           }
@@ -324,18 +325,18 @@ class WebGLApp {
     gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, this.massUniformBuffer);
   }
 
-  //   setupQuadVa() {
-  //     const gl = this.gl;
-  //     this.vb = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
-  //     this.quadVBO = WebGLUtility.createVbo(this.gl, this.vb);
+  setupQuadVa() {
+    const gl = this.gl;
+    this.vb = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+    this.quadVBO = WebGLUtility.createVbo(this.gl, this.vb);
 
-  //     this.quadVAO = gl.createVertexArray();
-  //     gl.bindVertexArray(this.quadVAO);
-  //     gl.bindBuffer(gl.ARRAY_BUFFER, this.quadVBO);
-  //     gl.enableVertexAttribArray(0);
-  //     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-  //     gl.bindVertexArray(null);
-  //   }
+    this.quadVAO = gl.createVertexArray();
+    gl.bindVertexArray(this.quadVAO);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.quadVBO);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.bindVertexArray(null);
+  }
 
   setupMassDraw() {
     const gl = this.gl;
@@ -386,22 +387,21 @@ class WebGLApp {
 
     // ビューポートの設定と背景のクリア
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    gl.clear(gl.COLOR_BUFFER_BIT);
 
+    // draw semi-transparent background
+    this.massProgram.use();
+    gl.bindVertexArray(this.quadVAO);
+    const sizeUniformLocation = gl.getUniformLocation(
+      this.massProgram.program,
+      "uResolution"
+    );
+    gl.uniform2f(sizeUniformLocation, this.canvas.width, this.canvas.height);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    // draw particles
     const tfs = [this.tfA, this.tfB];
     const sourceIndex = this.currentSourceIdx;
     const destIndex = (this.currentSourceIdx + 1) % 2;
-
-    if (!this.hiddenMasses) {
-      this.massProgram.use();
-      gl.bindVertexArray(this.massPositionVAO);
-      const sizeUniformLocation = gl.getUniformLocation(
-        this.massProgram.program,
-        ["size"]
-      );
-      gl.uniform1f(sizeUniformLocation, this.size);
-      gl.drawArrays(gl.POINTS, 0, this.masses.length);
-    }
 
     this.shaderProgram.use();
     this.shaderProgram.setUniform([this.size]);
