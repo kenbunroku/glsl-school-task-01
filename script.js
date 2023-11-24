@@ -1,5 +1,6 @@
 import { WebGLUtility, ShaderProgram } from "./lib/webgl.js";
 import { Pane } from "./lib/tweakpane-4.0.0.min.js";
+import Stats from 'stats.js'
 
 window.addEventListener(
   "DOMContentLoaded",
@@ -48,6 +49,11 @@ class WebGLApp {
     this.currentSourceIdx = 1;
 
     this.pickedIdx = null;
+
+    // Create stats.js to monitor FPS
+    this.stats = new Stats();
+    this.stats.showPanel(0);
+    document.body.appendChild(this.stats.dom);
 
     // tweakpane を初期化
     const pane = new Pane();
@@ -450,6 +456,8 @@ class WebGLApp {
   render() {
     const gl = this.gl;
 
+    this.stats.begin();
+
     // running が true の場合は requestAnimationFrame を呼び出す
     if (this.running === true) {
       requestAnimationFrame(this.render);
@@ -485,6 +493,8 @@ class WebGLApp {
     const temp = this.backgroundTexture;
     this.backgroundTexture = this.screenTexture;
     this.screenTexture = temp;
+
+    this.stats.end();
   }
   /**
    * リサイズ処理を行う。
