@@ -37,13 +37,13 @@ class WebGLApp {
       size: 3.0,
       gravity: 0.00002,
       hiddenMasses: false,
-      attenuation: 0.1,
+      fadeOpacity: 0.9,
     };
     this.numOfParticles = PARAMS.numOfParticles;
     this.size = PARAMS.size;
     this.gravity = PARAMS.gravity;
     this.hiddenMasses = PARAMS.hiddenMasses;
-    this.attenuation = PARAMS.attenuation;
+    this.fadeOpacity = PARAMS.fadeOpacity;
 
     this.currentSourceIdx = 1;
 
@@ -80,12 +80,12 @@ class WebGLApp {
       this.hiddenMasses = v.value;
     });
     pane
-      .addBinding(PARAMS, "attenuation", {
+      .addBinding(PARAMS, "fadeOpacity", {
         min: 0.01,
         max: 1.0,
       })
       .on("change", (v) => {
-        this.attenuation = v.value;
+        this.fadeOpacity = v.value;
       });
 
     // マウス座標用のイベントを設定
@@ -160,6 +160,7 @@ class WebGLApp {
     this.setupMass();
     this.setupMassDraw();
     this.setupQuadVa();
+    this.setupFramebuffer();
     this.resize();
     this.gl.enable(this.gl.BLEND);
     this.gl.blendFuncSeparate(
@@ -168,7 +169,7 @@ class WebGLApp {
       this.gl.ONE,
       this.gl.ONE
     );
-    this.gl.clearColor(0.0, 0.0, 0.0, 1.0);
+    this.gl.clearColor(0.1, 0.1, 0.1, 0.0);
     this.running = true;
     // Inside the WebGLApp constructor or init method
     this.maxTFComponents = this.gl.getParameter(
@@ -225,6 +226,11 @@ class WebGLApp {
       { passive: false }
     );
   }
+
+  setupFramebuffer() {
+    this.framebuffer = this.gl.createFramebuffer();
+  }
+
   /**
    * ジオメトリ（頂点情報）を構築するセットアップを行う。
    */
@@ -375,37 +381,14 @@ class WebGLApp {
     this.massPositionVAO = massPositionVAO;
   }
 
-  /**
-   * WebGL を利用して描画を行う。
-   */
-  render() {
+  drawTexture(texture, opacity) {
     const gl = this.gl;
-
-    // running が true の場合は requestAnimationFrame を呼び出す
-    if (this.running === true) {
-      requestAnimationFrame(this.render);
-    }
-
-    for (let i = 0; i < this.masses.length; i++) {
-      this.masses[i][3] = this.gravity;
-    }
-    const updatedMasses = new Float32Array(
-      this.masses.map((m) => [...m]).flat()
-    );
-    gl.bindBuffer(gl.UNIFORM_BUFFER, this.massUniformBuffer);
-    gl.bufferData(gl.UNIFORM_BUFFER, updatedMasses, gl.DYNAMIC_DRAW);
-    gl.bindBuffer(gl.UNIFORM_BUFFER, null);
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.massPositionVBO);
-    gl.bufferData(gl.ARRAY_BUFFER, updatedMasses, gl.DYNAMIC_DRAW);
-    gl.bindBuffer(gl.ARRAY_BUFFER, null);
-
-    // ビューポートの設定と背景のクリア
-    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-
-    // draw semi-transparent background
     this.massProgram.use();
+
     gl.bindVertexArray(this.quadVAO);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+
     const resolutionUniformLocation = gl.getUniformLocation(
       this.massProgram.program,
       "uResolution"
@@ -423,10 +406,20 @@ class WebGLApp {
     gl.uniform1i(hiddenMassesUniformLocation, hiddenMassesFlag);
     const attenuationUniformLocation = gl.getUniformLocation(
       this.massProgram.program,
-      "uAttenuation"
+      "uOpacity"
     );
-    gl.uniform1f(attenuationUniformLocation, this.attenuation);
+    gl.uniform1f(attenuationUniformLocation, opacity);
+    const textureUniformLocation = gl.getUniformLocation(
+      this.massProgram.program,
+      "uTexture"
+    );
+    gl.uniform1i(textureUniformLocation, 0);
+
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  drawParticles() {
+    const gl = this.gl;
 
     // draw particles
     const tfs = [this.tfA, this.tfB];
@@ -450,6 +443,49 @@ class WebGLApp {
 
     this.currentSourceIdx = destIndex;
   }
+
+  /**
+   * WebGL を利用して描画を行う。
+   */
+  render() {
+    const gl = this.gl;
+
+    // running が true の場合は requestAnimationFrame を呼び出す
+    if (this.running === true) {
+      requestAnimationFrame(this.render);
+    }
+
+    for (let i = 0; i < this.masses.length; i++) {
+      this.masses[i][3] = this.gravity;
+    }
+    const updatedMasses = new Float32Array(
+      this.masses.map((m) => [...m]).flat()
+    );
+    gl.bindBuffer(gl.UNIFORM_BUFFER, this.massUniformBuffer);
+    gl.bufferData(gl.UNIFORM_BUFFER, updatedMasses, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.UNIFORM_BUFFER, null);
+
+    // ビューポートの設定と背景のクリア
+    WebGLUtility.bindFramebuffer(gl, this.framebuffer, this.screenTexture);
+    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    // draw semi-transparent background
+    this.drawTexture(this.backgroundTexture, this.fadeOpacity);
+    // draw particles
+    this.drawParticles();
+
+    WebGLUtility.bindFramebuffer(gl, null);
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    this.drawTexture(this.screenTexture, 1.0);
+    gl.disable(gl.BLEND);
+
+    const temp = this.backgroundTexture;
+    this.backgroundTexture = this.screenTexture;
+    this.screenTexture = temp;
+  }
   /**
    * リサイズ処理を行う。
    */
@@ -457,6 +493,26 @@ class WebGLApp {
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
     this.uResolution = [this.canvas.width, this.canvas.height];
+    this.setupFramebuffer();
+
+    const gl = this.gl;
+    const emptyPixels = new Uint8Array(
+      this.canvas.width * this.canvas.height * 4
+    );
+    this.backgroundTexture = WebGLUtility.createTexture(
+      gl,
+      gl.NEAREST,
+      emptyPixels,
+      this.canvas.width,
+      this.canvas.height
+    );
+    this.screenTexture = WebGLUtility.createTexture(
+      gl,
+      gl.NEAREST,
+      emptyPixels,
+      this.canvas.width,
+      this.canvas.height
+    );
   }
   /**
    * WebGL を実行するための初期化処理を行う。
@@ -477,8 +533,8 @@ class WebGLApp {
     }
     const contextAttributes = {
       ...option,
-      premultipliedAlpha: false,
-      preserveDrawingBuffer: true,
+      alpha: true,
+      antialias: false,
     };
     this.gl = this.canvas.getContext("webgl2", contextAttributes);
     if (this.gl == null) {

@@ -5,9 +5,10 @@ layout(std140) uniform Mass {
     vec4 massPosition[3];
 };
 
+uniform sampler2D uTexture;
 uniform vec2 uResolution;
 uniform int uHiddenMasses;
-uniform float uAttenuation;
+uniform float uOpacity;
 
 out vec4 fragColor;
 
@@ -19,9 +20,11 @@ void main() {
         minDist = min(minDist, dist2);
     }
 
+    vec3 bg = texture(uTexture, gl_FragCoord.xy / uResolution).rgb;
+
     if(minDist > 5.0f * 5.0f || uHiddenMasses == 1) {
         // Slightly transparent black
-        fragColor = vec4(0.0f, 0.0f, 0.0f, uAttenuation);
+        fragColor = vec4(floor(255.0f * bg * uOpacity) / 255.0f, uOpacity);
     } else {
         // Red color for mass positions
         fragColor = vec4(1.0f, 0.0f, 0.0f, 1.0f);
